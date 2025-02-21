@@ -1,129 +1,175 @@
 
-<% if !@i.present? %>
+<!-- jQuery (CDN) -->
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-ujs/1.2.3/rails.min.js"></script>
+
+
+
 <% url = spree.product_path(product, taxon_id: @taxon&.id) %>
-<%#= link_to url, class: 'h-100 d-flex flex-column justify-content-between' do %>
-  <% cache [common_product_cache_keys, product] do %>
+<% variant = product.default_variant || product.master %>
+
+<% cache [common_product_cache_keys, product] do %>
+  <!-- Image Section -->
+  <%= link_to url, class: 'd-block' do %>
     <%= plp_and_carousel_image(product, image_class) %>
-    <div>
-      <div class="product-component-name" title="<%= product.name %>">
-        <%= product.name %>
-      </div>
-      <div class="product-component-price"><%= display_price(product) %></div>
-    </div>
   <% end %>
-<%#end %>
+
+  <!-- Product Name and Price -->
+  <div class="product-details">
+    <div class="product-component-name" title="<%= product.name %>">
+      <%= product.name %>
+    </div>
+    <div class="product-component-price">
+      <%= display_price(product) %>
+    </div>
+  </div>
+
+  <!-- Options and Stock Row -->
+  <table class="table product-options-stock">
+    <tbody>
+      <tr>
+        <% if variant && variant.option_values.present? %>
+          <% variant.option_values.each do |option_value| %>
+            <td class="option-type">
+              <strong><%= option_value.option_type.presentation %>:</strong>
+              <%= option_value.presentation %>
+            </td>
+          <% end %>
+        <% end %>
+        <td class="product-stock">
+          <strong>Stock:</strong>
+          <span id="stock-<%= product.id %>"><%= variant.try(:total_on_hand) || 0 %></span>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="<%= (variant.option_values.present? ? variant.option_values.size + 1 : 1) %>">
+        <!-- Update Stock Button -->
+        <button class="btn btn-primary product-action-btn"
+                data-product-id="<%= product.id %>"
+                data-action="update_stock">
+          Update Stock
+        </button>
+    
+        <!-- Buy Now Button -->
+        <button class="btn btn-success product-action-btn"
+                data-product-id="<%= product.id %>"
+                data-action="buy_now">
+          Buy Now
+        </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+<% end %>
 
 
 
-<%= render 'spree/shared/modals', product: product %>
 
+<!-- Bootstrap Modal -->
+<div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="productModalLabel">Product Action</h5>
+        <button type="button" id="close-action-btn" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="product-info"></p>
+        <label for="quantity">Quantity:</label>
+        <input type="number" id="quantity" class="form-control" min="1" value="1">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancel-action-btn" data-bs-dismiss="modal">Cancel</button>
+     
 
-<!-- Bootstrap JavaScript -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Your custom script -->
+        <button type="button" id="confirm-action-btn" class="btn btn-primary">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Helper function to get CSRF token from meta tag
-    function getCSRFToken() {
-        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    }
+$(document).ready(function () {
+  $("#cancel-action-btn").on("click", function () {
+  $("#productModal").modal("hide");
+});
 
-    // Helper function to show a Bootstrap modal
-    function showModal(modalId) {
-        var modalEl = document.getElementById(modalId);
-        var modal = new bootstrap.Modal(modalEl);
-        modal.show();
-        return modal;
-    }
+$("#close-action-btn").on("click", function () {
+  $("#productModal").modal("hide");
+});
 
-    // Update Stock Button Click
-    document.querySelectorAll('.update-stock-btn').forEach(function (button) {
-        button.addEventListener('click', function (e) {
-            e.preventDefault();
-            var productId = this.getAttribute('data-product-id');
-            document.getElementById('update-stock-product-id').value = productId;
-            document.getElementById('new-stock-value').value = '';
-            showModal('updateStockModal');
-        });
+
+  $(".product-action-btn").off("click").on("click", function () {
+    let productId = $(this).data("product-id");
+    let actionType = $(this).data("action");
+
+    // AJAX Request to Fetch Product Details
+    $.ajax({
+      url: "/custom/" + productId + "/modal_data",
+      type: "GET",
+      headers: {
+        "X-CSRF-Token": $("meta[name='csrf-token']").attr("content") // Include CSRF token
+      },
+      data: { action_type: actionType },
+      success: function (response) {
+        $("#productModalLabel").text(response.title);
+        $("#product-info").text("Product: " + response.product_name);
+        $("#confirm-action-btn").data("product-id", productId);
+        $("#confirm-action-btn").data("action-type", actionType);
+        $("#productModal").modal("show");
+      },
+      error: function (xhr) {
+        if (xhr.status === 403) {
+          alert("Unauthorized! Please log in as an admin.");
+        } else {
+          alert("Failed to load product data.");
+        }
+      }
     });
+    
+  });
 
-    // Update Stock Submit
-    document.getElementById('update-stock-submit').addEventListener('click', function () {
-        var form = document.getElementById('update-stock-form');
-        var formData = new FormData(form);
-        
-        // Include CSRF token in the request headers
-        fetch(`/admin/variants/${formData.get('product_id')}/update_stock`, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-Token': getCSRFToken()
-            }
-        })
-        .then(function (response) {
-            if (response.ok) return response.json();
-            throw new Error('Network response was not ok');
-        })
-        .then(function (data) {
-            alert('Stock updated successfully!');
-            var modalEl = document.getElementById('updateStockModal');
-            var modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-        })
-        .catch(function (error) {
-           
-            console.error(error);
-        });
+  // Handle Confirm Button Click
+  // Handle Confirm Button Click
+  // Handle Confirm Button Click
+  // Handle Confirm Button Click
+  $("#confirm-action-btn").off("click").on("click", function () {
+    let productId = $(this).data("product-id");
+    let actionType = $(this).data("action-type");
+    let quantity = parseInt($("#quantity").val(), 10);
+  
+    // AJAX Request to Process Action
+    $.ajax({
+      url: "/custom/" + productId + "/process_product_action",
+      type: "POST",
+      headers: {
+        "X-CSRF-Token": $("meta[name='csrf-token']").attr("content") // Include CSRF token
+      },
+      data: {
+        action_type: actionType,
+        quantity: quantity
+      },
+      success: function (response) {
+       
+        $("#productModal").modal("hide");
+  
+        // Update stock count dynamically if the response contains updated stock
+        if (response.updated_stock !== undefined) {
+          $("#stock-" + response.product_id).text(response.updated_stock);
+        }
+      },
+      error: function (xhr) {
+        if (xhr.status === 401) {
+          alert("Unauthorized! Please log in as an admin.");
+          window.location.href = "/admin/login";
+        } else {
+          alert("Failed to process request.");
+        }
+      }
     });
-
-    // Book Now Button Click
-    document.querySelectorAll('.book-now-btn').forEach(function (button) {
-        button.addEventListener('click', function (e) {
-            e.preventDefault();
-            var productId = this.getAttribute('data-product-id');
-            document.getElementById('book-now-product-id').value = productId;
-            document.getElementById('booking-quantity').value = '';
-            showModal('bookNowModal');
-        });
-    });
-
-    // Book Now Submit
-    document.getElementById('book-now-submit').addEventListener('click', function () {
-        var form = document.getElementById('book-now-form');
-        var formData = new FormData(form);
-        formData.append('ship_address_id', '1');
-        formData.append('bill_address_id', '1');
-        formData.append('payment_method_id', '2');
-
-        fetch('/orders/create_and_complete', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-Token': getCSRFToken()
-            }
-        })
-        .then(function (response) {
-            if (response.ok) return response.json();
-            throw new Error('Network response was not ok');
-        })
-        .then(function (data) {
-            alert('Order placed successfully!');
-            var modalEl = document.getElementById('bookNowModal');
-            var modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-        })
-        .catch(function (error) {
-          
-            console.error(error);
-        });
-    });
+  });
+  
+  
+  
 });
 
 </script>
-
-<% end %>
-
-<% @i= 1 %>

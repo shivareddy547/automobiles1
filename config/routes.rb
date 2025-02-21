@@ -17,6 +17,53 @@ Rails.application.routes.draw do
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
+# config/routes.rb
+# Spree::Core::Engine.routes.draw do
+#   post '/custom/update_stock', to: 'custom#update_stock', as: :custom_update_stock
+# end
+
+Spree::Core::Engine.add_routes do
+
+
+  # namespace :admin do
+    resources :custom, only: [] do
+      member do
+        get "modal_data"
+        post "process_product_action"
+      end
+    # end
+  end
+  
+  post '/custom/:id/process_product_action', to: 'spree/custom#process_product_action'
+
+
+  # namespace :admin do
+  #   resources :custom do
+  #     member do
+  #       get "modal_data"
+  #       post "process_action"
+  #     end
+  #   end
+    
+  #   # namespace :custom do
+  #   #   post 'update_stock'
+  #   # end
+  # end
+  
+end
+
+Spree::Core::Engine.routes.draw do
+  patch "/update_stock/:id", to: "products#update_stock"
+end
+
+
+
+
+resources :products do
+  member do
+    patch 'update_stock'
+  end
+end
 
   # Defines the root path route ("/")
   # root "posts#index"
