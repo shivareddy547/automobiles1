@@ -14,16 +14,22 @@ module Spree
 
     def process_product_action
       product = Spree::Product.find(params[:id])
+      variant = product.variants&.first
       action_type = params[:action_type]
       quantity = params[:quantity].to_i
     
       if action_type == "update_stock"
-        stock_item = product.stock_items.first
+        stock_item = variant.stock_items&.first
         if stock_item
           stock_item.adjust_count_on_hand(quantity)
           updated_stock = stock_item.count_on_hand
         else
-          updated_stock = 0
+          stock_item = Spree::StockItem.create!(
+            stock_location: Spree::StockLocation.first,
+            variant: variant,
+            count_on_hand: quantity
+          )
+          updated_stock =  stock_item.count_on_hand
         end
         message = "Stock updated for #{product.name}."
     
@@ -60,7 +66,7 @@ module Spree
       
         order.next! while order.can_next?
       
-        updated_stock = product.stock_items.first.try(:count_on_hand) || 0
+        updated_stock = variant.stock_items&.first.try(:count_on_hand) || 0
         message = "Successfully purchased #{quantity} of #{product.name}. Your order ##{order.number} is complete."
         product.update_outofstock_taxon
         # return render json: { message: message, product_id: product.id, updated_stock: updated_stock }

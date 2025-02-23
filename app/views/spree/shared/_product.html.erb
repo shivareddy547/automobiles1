@@ -1,17 +1,10 @@
-
-<!-- jQuery (CDN) -->
-<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-ujs/1.2.3/rails.min.js"></script>
-
-
-
 <% url = spree.product_path(product, taxon_id: @taxon&.id) %>
-<% variant = product.default_variant || product.master %>
+<% variant = product.variants.first || product.master %>
 
 <% cache [common_product_cache_keys, product] do %>
   <!-- Image Section -->
   <%= link_to url, class: 'd-block' do %>
-    <%= plp_and_carousel_image(product, image_class) %>
+    <%= plp_and_carousel_image(product, "product-component-image d-block img-fluid") %>
   <% end %>
 
   <!-- Product Name and Price -->
@@ -25,68 +18,78 @@
   </div>
 
   <!-- Options and Stock Row -->
-  <table class="table product-options-stock">
-    <tbody>
-      <tr>
-        <% if variant && variant.option_values.present? %>
-          <% variant.option_values.each do |option_value| %>
-            <td class="option-type">
-              <strong><%= option_value.option_type.presentation %>:</strong>
-              <%= option_value.presentation %>
-            </td>
-          <% end %>
-        <% end %>
-        <td class="product-stock">
-          <strong>Stock:</strong>
-          <span id="stock-<%= product.id %>"><%= variant.try(:total_on_hand) || 0 %></span>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="<%= (variant.option_values.present? ? variant.option_values.size + 1 : 1) %>">
-        <!-- Update Stock Button -->
-        <button class="btn btn-primary product-action-btn"
-                data-product-id="<%= product.id %>"
-                data-action="update_stock">
-          Update Stock
-        </button>
-    
-        <!-- Buy Now Button -->
-        <button class="btn btn-success product-action-btn"
-                data-product-id="<%= product.id %>"
-                data-action="buy_now">
-          Buy Now
-        </button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-<% end %>
-
-
-
-
-<!-- Bootstrap Modal -->
-<div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="productModalLabel">Product Action</h5>
-        <button type="button" id="close-action-btn" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p id="product-info"></p>
-        <label for="quantity">Quantity:</label>
-        <input type="number" id="quantity" class="form-control" min="1" value="1">
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" id="cancel-action-btn" data-bs-dismiss="modal">Cancel</button>
-     
-
-        <button type="button" id="confirm-action-btn" class="btn btn-primary">Confirm</button>
-      </div>
+  <div class="product-options-stock">
+    <% if variant && variant.option_values.present? %>
+      <% variant.option_values.each do |option_value| %>
+        <div class="option-type">
+          <strong><%= option_value.option_type.presentation %>:</strong>
+          <%= option_value.presentation %>
+        </div>
+      <% end %>
+    <% end %>
+    <div class="product-stock">
+      <strong>Stock:</strong>
+      <span id="stock-<%= product.id %>"><%= variant.try(:total_on_hand) || 0 %></span>
     </div>
   </div>
-</div>
+
+  <!-- Action Buttons -->
+  <div class="product-action-buttons d-flex flex-column flex-md-row mt-3">
+    <button class="btn btn-primary product-action-btn flex-fill me-3"
+            data-product-id="<%= product.id %>"
+            data-action="update_stock">
+      Update Stock
+    </button>
+    <button class="btn btn-success product-action-btn flex-fill"
+            data-product-id="<%= product.id %>"
+            data-action="buy_now">
+      Buy Now
+    </button>
+  </div>
+
+<% end %>
+
+<style>
+
+.product-action-buttons .btn{
+    margin: 3px;
+  }
+
+.product-component-image {
+  width: 100%;
+  max-width: 250px;
+  height: auto;
+  object-fit: cover;
+}
+
+.product-options-stock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.option-type, .product-stock {
+  flex: 1;
+  min-width: 120px;
+}
+
+.product-action-buttons {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .product-action-buttons {
+    flex-direction: row;
+   
+  }
+  .product-action-buttons .btn{
+    margin: 3px;
+  }
+}
+
+</style>
+
 <script>
 $(document).ready(function () {
   $("#cancel-action-btn").on("click", function () {
@@ -154,7 +157,9 @@ $("#close-action-btn").on("click", function () {
   
         // Update stock count dynamically if the response contains updated stock
         if (response.updated_stock !== undefined) {
-          $("#stock-" + response.product_id).text(response.updated_stock);
+          console.log(("#stock-"+response.product_id).length)
+          $(".product-stock #stock-" + response.product_id).text(response.updated_stock);
+
         }
       },
       error: function (xhr) {

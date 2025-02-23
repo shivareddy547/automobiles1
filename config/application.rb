@@ -37,5 +37,6 @@ module SpreeStarter
     # config.eager_load_paths << Rails.root.join("extras")
 
     config.mission_control.jobs.base_controller_class = "Spree::Admin::BaseController"
+    config.hosts << "awfully-quick-monkfish.ngrok-free.app"
   end
 end
